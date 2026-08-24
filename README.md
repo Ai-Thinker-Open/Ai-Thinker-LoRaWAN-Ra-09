@@ -1,24 +1,50 @@
-# STM32CubeWL MCU Firmware Package
+[![中文](https://img.shields.io/badge/中文-README-blue)](README.zh.md)
 
-![latest tag](https://img.shields.io/github/v/tag/STMicroelectronics/STM32CubeWL.svg?color=brightgreen)
+# Ai-Thinker LoRaWAN Ra-09 SDK
 
-**STM32Cube** is an STMicroelectronics original initiative to ease developers' life by reducing efforts, time and cost.
+This repository contains the STM32CubeWL firmware package used by the Ai-Thinker Ra-09 SDK. The repository is based on STMicroelectronics STM32CubeWL and includes an Ai-Thinker UART-to-LoRa application for the STM32WL55 Cortex-M4 target.
 
-**STM32Cube** covers the overall STM32 products portfolio. It includes a comprehensive embedded software platform (this repo), delivered for each series (such as the STM32CubeWL for the STM32WL series).
-   * The CMSIS modules (core and device) corresponding to the ARM tm core implemented in this STM32 product
-   * The STM32 HAL-LL drivers : an abstraction drivers layer, the API ensuring maximized portability across the STM32 portfolio 
-   * The BSP Drivers of each evaluation or demonstration board provided by this STM32 series 
-   * A consistent set of middlewares libraries such as RTOS, FatFS, LoRaWAN, Sigfox, Key Management Services ...
-   * A full set of software projects (basic examples, applications or demonstrations) for each board provided by this STM32 series
-   
-The **STM32CubeWL MCU Package** projects are directly running on the STM32WL series boards. You can find in each Projects/*Board name* directories a set of software projects (Applications/Demonstration/Examples). 
+## Start here
 
-## Boards available
-  * STM32WL 
-    * [NUCLEO-WL55JC](https://www.st.com/en/evaluation-tools/nucleo-wl55jc.html)
+The product-specific application is located at:
 
-## Troubleshooting
+```text
+Projects/NUCLEO-WL55JC/Applications/SubGHz_Phy/UART_To_LoRa/
+```
 
-**Caution** : The **Issues** requests are strictly limited to submit problems or suggestions related to the software delivered in this repo 
+- [UART-to-LoRa usage and AT commands](Projects/NUCLEO-WL55JC/Applications/SubGHz_Phy/UART_To_LoRa/README.md)
+- [Code entry points](docs/CODE_ENTRY.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Build and validation evidence](docs/VALIDATION.md)
+- [Package license terms](Package_license.md)
 
-**For any question** related to the STM3WL product, the hardware performance, the hardware characteristics, the tools, the environment, you can submit a topic on the [ST Community/STM32 MCUs forum](https://community.st.com/s/group/0F90X000000AXsASAW/stm32-mcus)
+## Supported project formats
+
+| Toolchain | Project/build entry | Status |
+|---|---|---|
+| GNU Arm Embedded | `GNUmakefile` in `UART_To_LoRa` | Reproducibly built with GCC 10.3.1 |
+| STM32CubeIDE | `UART_To_LoRa/STM32CubeIDE/.project` | Project references repaired; not exercised with the IDE in this audit |
+| Keil MDK-ARM | `UART_To_LoRa/MDK-ARM/*.uvprojx` | Present; not exercised in this audit |
+
+## GNU build
+
+Install `make` and `arm-none-eabi-gcc`, then run:
+
+```bash
+cd Projects/NUCLEO-WL55JC/Applications/SubGHz_Phy/UART_To_LoRa
+make -f GNUmakefile -j2
+```
+
+The build creates ELF, HEX and BIN files under `build/`. Run `make -f GNUmakefile clean` to remove them.
+
+## Package scope
+
+The rest of the tree is the STM32CubeWL platform package: CMSIS, STM32 HAL/LL drivers, BSPs, middleware, utilities, examples and demonstrations. Refer to ST's component documentation before changing vendor code.
+
+## Validation boundary
+
+The documented build was performed without flashing hardware. Serial AT behavior, RF performance, range, sleep/wakeup, flash persistence and interoperability require Ra-09 hardware tests and are not claimed as verified.
+
+## License
+
+This repository contains components under different licenses. The package-level terms and component license matrix are in [Package_license.md](Package_license.md). Retain the copyright and license notices of each component.

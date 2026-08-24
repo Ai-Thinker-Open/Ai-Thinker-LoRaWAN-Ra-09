@@ -1,273 +1,84 @@
-# UART_To_LoRa — AT 指令配置说明
+[![中文](https://img.shields.io/badge/中文-文档-blue)](README.zh.md)
 
-固件兼容 **ra08 `lora_transparent_lpuart_ADDR`** 指令集。上电后处于 **AT 模式**；完成射频与地址配置并执行 `AT+CTX` 后进入 **透传模式**。
+# UART to LoRa application
 
-**串口**：LPUART1，**9600 8N1**（PA2=TX，PA3=RX）。  
-**行结束符**：每条 AT 指令以 **`\\r\\n`**（CR+LF）结束。
+This STM32WL55 application provides an Ra-08-compatible UART AT interface and transparent LoRa transport. It starts in AT mode. After configuring addresses and radio parameters with `AT+CTX`, raw UART data is framed and sent over LoRa.
 
----
+## Interface
 
-## 一、配置流程（推荐顺序）
+- UART: LPUART1, 9600 baud, 8 data bits, no parity, 1 stop bit.
+- Pins: PA2 TX, PA3 RX.
+- AT line ending: CR+LF (`\r\n`).
+- Maximum transparent user payload: 247 bytes.
 
-```
-上电
-  │
-  ├─► 串口出现：use default config / use last config
-  │              AT_MODE
-  │
-  ├─► ① AT+CADDR=<本机地址>        设置本机 LoRa 地址
-  │
-  ├─► ② AT+CTXADDR=<目标地址>      设置对端 LoRa 地址
-  │
-  ├─► ③ AT+CTX=<freq>,<dr>,<bw>,<cr>,<pwr>,<iq>   配置射频并进入透传
-  │       （参数写入 Flash，下次上电可自动恢复）
-  │
-  ├─► ④ 直接发送业务数据（透传，无需 AT 前缀）
-  │       串口空闲约 15 ms 后自动组包经 LoRa 发出
-  │       成功：TXDONE
-  │
-  └─► ⑤ 发送 +++（仅三个加号，可跟 \\r\\n）退出透传 → AT_MODE
-```
+## Recommended setup
 
-**双机互通**：两块板子射频参数（`AT+CTX` 六个参数）必须一致；本机 `CADDR` 须等于对端 `CTXADDR`，反之亦然。
+1. Set the local address: `AT+CADDR=<address>`.
+2. Set the peer address: `AT+CTXADDR=<address>`.
+3. Configure LoRa and enter transparent mode:
+   `AT+CTX=<freq>,<dr>,<bw>,<cr>,<power>,<iq>`.
+4. Send raw application bytes. About 15 ms of UART idle closes a packet.
+5. Send exactly `+++` to return to AT mode.
 
-### 配置示例（两块板）
-
-| 角色 | 本机地址 `AT+CADDR` | 目标地址 `AT+CTXADDR` | `AT+CTX`（两端相同） |
-|------|---------------------|------------------------|----------------------|
-| 板 A | `10` | `20` | `470625000,3,0,1,22,0` |
-| 板 B | `20` | `10` | `470625000,3,0,1,22,0` |
+For two devices, use identical radio parameters. Device A's local address must equal device B's target address, and vice versa.
 
 ```text
-AT
-OK
-
 AT+CADDR=10
-set local address: 10
-OK
-
 AT+CTXADDR=20
-set target address: 20
-OK
-
 AT+CTX=470625000,3,0,1,22,0
-config radio params data(freq: 470625000, dr: 3, bw:0, cr: 1, power: 22 iqInverted: 0)
-LORA_TRANSPARENT_MODE
-LoRa Config(freq: 470625000, dr: 3, bw:0, cr: 1, power: 22)
-
 hello
-TXDONE
 ```
 
-透传下发数据时，模块在无线帧中自动添加：**帧头 `0xAA` + 本机地址(2B) + 目标地址(2B) + 载荷 + 校验和**。
+## Commands
 
----
+| Command | Purpose |
+|---|---|
+| `AT` | Check the UART command link |
+| `AT+CADDR=<addr>` | Set the 16-bit local address |
+| `AT+CTXADDR=<addr>` | Set the 16-bit peer address |
+| `AT+CTX=<freq>,<dr>,<bw>,<cr>,<pwr>,<iq>` | Configure LoRa and enter transparent mode |
+| `AT+CTXCW=<freq>,<pwr>` | Start continuous-wave transmission for RF testing |
+| `AT+CSLEEP=<mode>` | Enter the implemented low-power flow |
+| `AT+CSTDBY=<mode>` | Enter the implemented standby/low-power flow |
+| `+++` | Leave transparent mode |
 
-## 二、指令格式
+An invalid command returns `+CMD ERROR:1`.
 
-| 形式 | 说明 | 示例 |
-|------|------|------|
-| `AT` | 测试链路 | `AT` → `OK` |
-| `AT+<CMD>=<p1>,<p2>,...` | 设置（逗号分隔） | `AT+CTX=470625000,3,0,1,22,0` |
-| `AT+<CMD>=<n>` | 单参数设置 | `AT+CADDR=10` |
-| `AT+<CMD>?` | 查询（部分指令支持） | — |
-| `AT+<CMD>=?` | 参数说明（部分指令支持） | — |
-| 透传数据 | 无 `AT` 前缀的原始字节 | `hello` |
-| `+++` | 退出透传（仅 `+`×3） | `+++` → `AT_MODE` |
+## `AT+CTX` parameters
 
-解析失败时返回：`\r\n+CMD ERROR:1\r\n`
+| Parameter | Accepted value | Default/correction |
+|---|---|---|
+| `freq` | 100,000,000–1,000,000,000 Hz | 470,625,000 Hz |
+| `dr` | 0–7; spreading factor is `12 - dr` | 3 (SF9) |
+| `bw` | 0=125 kHz, 1=250 kHz, 2=500 kHz | 0 |
+| `cr` | 1=4/5, 2=4/6, 3=4/7, 4=4/8 | 1 |
+| `pwr` | 0–22 dBm | 22 dBm |
+| `iq` | 0=normal, 1=inverted | 0 |
 
----
+Radio parameters are stored at the application-configured Flash address and restored at startup. Local and peer addresses are not persisted by the current implementation.
 
-## 三、指令列表
+## Transparent framing and responses
 
-| 指令 | 功能 | 格式 |
-|------|------|------|
-| `AT` | 链路测试 | `AT` |
-| `AT+CADDR` | 设置本机地址 | `AT+CADDR=<addr>` |
-| `AT+CTXADDR` | 设置目标地址 | `AT+CTXADDR=<addr>` |
-| `AT+CTX` | 配置 LoRa 射频并进入透传 | `AT+CTX=<freq>,<dr>,<bw>,<cr>,<pwr>,<iq>` |
-| `AT+CTXCW` | 单载波发射（测试用） | `AT+CTXCW=<freq>,<pwr>` |
-| `AT+CSLEEP` | 进入低功耗 | `AT+CSLEEP=<mode>` |
-| `AT+CSTDBY` | 进入待机/低功耗 | `AT+CSTDBY=<mode>` |
+The transmitted radio frame contains `0xAA`, a two-byte local address, a two-byte peer address, payload and checksum. Common responses are:
 
----
+| Response | Meaning |
+|---|---|
+| `AT_MODE` | Command mode |
+| `LORA_TRANSPARENT_MODE` | Transparent mode entered |
+| `TXDONE` / `TXTIMEOUT` | Transmission completed / timed out |
+| `RXDONE` / `RXTIMEOUT` / `RXERROR` | Receive result |
+| `BUSY` | Radio busy; the submitted UART packet was not sent |
 
-## 四、`AT+CTX` 参数说明
+## Build
 
-```text
-AT+CTX=<freq>,<dr>,<bw>,<cr>,<pwr>,<iq>
+GNU Arm Embedded build:
+
+```bash
+make -f GNUmakefile -j2
 ```
 
-| 参数 | 含义 | 合法范围 | 默认值（越界时自动修正） |
-|------|------|----------|--------------------------|
-| **freq** | 载波频率，单位 **Hz** | `100000000` ~ `1000000000` | `470625000` |
-| **dr** | 数据率索引（映射扩频因子 SF） | `0` ~ `7` | `3` |
-| **bw** | 带宽索引 | `0` ~ `2`（实际射频仅支持 0~2） | `0` |
-| **cr** | LoRa 编码率索引 | `1` ~ `4` | `1` |
-| **pwr** | 发射功率，单位 **dBm** | `0` ~ `22` | `22` |
-| **iq** | IQ 反转 | `0` 或 `1` | `0` |
+STM32CubeIDE and Keil project files are also provided. See the repository-level [validation evidence](../../../../../docs/VALIDATION.md) before using generated firmware.
 
-### freq（频率）
+## Safety and validation boundary
 
-- 单位：**赫兹（Hz）**，例如 `470625000` 表示 470.625 MHz。
-- 须在 100 MHz ~ 1 GHz 之间；否则回退为 `470625000` 并提示 `freq error`。
-
-### dr（数据率索引 → 扩频因子 SF）
-
-内部换算：**SF = 12 − dr**（限制在 SF5 ~ SF12）。
-
-| dr | SF | 说明 |
-|----|-----|------|
-| 0 | 12 | 最慢、灵敏度最高 |
-| 1 | 11 | |
-| 2 | 10 | |
-| 3 | 9 | **默认** |
-| 4 | 8 | |
-| 5 | 7 | |
-| 6 | 6 | |
-| 7 | 5 | 最快、灵敏度最低 |
-
-### bw（带宽索引）
-
-| bw | 带宽 |
-|----|------|
-| 0 | **125 kHz**（默认） |
-| 1 | 250 kHz |
-| 2 | 500 kHz |
-
-> 设置值大于 2 时会被改为 `0`，并提示 `bw error, set to 125kHz`。
-
-### cr（编码率索引）
-
-对应 STM32 SubGHz 驱动中的 LoRa 编码率档位：
-
-| cr | 编码率 |
-|----|--------|
-| 1 | 4/5（**默认**） |
-| 2 | 4/6 |
-| 3 | 4/7 |
-| 4 | 4/8 |
-
-### pwr（发射功率）
-
-- 单位：**dBm**，范围 **0 ~ 22**。
-- 超过 22 时修正为 22，并提示 `pwr error`。
-
-### iq（IQ 反转）
-
-| 值 | 含义 |
-|----|------|
-| 0 | 不反转（**默认**） |
-| 1 | IQ 反转 |
-
-### 执行结果
-
-- 成功：打印 `config radio params data(...)`、`LORA_TRANSPARENT_MODE`，随后异步初始化射频（`LoRa Config(...)`）。
-- 参数写入 Flash（`0x0803F000`），下次上电显示 `use last config` 并保留射频参数；**地址需重新配置**（`AT+CADDR` / `AT+CTXADDR` 不写入 Flash）。
-- 执行 `AT+CTX` 后自动进入 **透传模式**。
-
----
-
-## 五、地址指令参数
-
-### `AT+CADDR=<addr>`
-
-| 参数 | 说明 |
-|------|------|
-| **addr** | 本机 16 位地址，十进制，例如 `0` ~ `65535` |
-
-- 默认：`0`
-- 成功：`set local address: <addr>\r\nOK\r\n`
-
-### `AT+CTXADDR=<addr>`
-
-| 参数 | 说明 |
-|------|------|
-| **addr** | 对端 16 位地址 |
-
-- 默认：`1`
-- 成功：`set target address: <addr>\r\nOK\r\n`
-
----
-
-## 六、其他指令参数
-
-### `AT+CTXCW=<freq>,<pwr>`
-
-连续波发射，用于频谱/功率测试（需射频已初始化）。
-
-| 参数 | 说明 |
-|------|------|
-| **freq** | 频率（Hz） |
-| **pwr** | 功率（dBm），`0` ~ `22` |
-
-成功示例：`Start to txcw (freq: 470625000, power: 22db)`
-
-### `AT+CSLEEP=<mode>` / `AT+CSTDBY=<mode>`
-
-| 参数 | 说明 |
-|------|------|
-| **mode** | 模式字（当前实现均进入深度睡眠流程） |
-
-回复：`enter deepsleep...` → 唤醒后 `leave deepsleep...`
-
----
-
-## 七、透传模式说明
-
-### 发送
-
-1. 已完成 `AT+CTX`（处于透传模式）。
-2. 向串口写入 **原始数据**（无需 `AT` 前缀）。
-3. 最后一字节到达后 **空闲约 15 ms**，模块组包发送。
-4. 单帧用户载荷最大 **247 字节**；超出会截断并提示 `data over flow`。
-5. 射频忙时返回 `BUSY\r\n`，本次数据丢弃。
-
-### 接收
-
-对端发来的有效帧会输出：
-
-```text
-rssi:<rssi> snr:<snr>
-RXDONE from <源地址> size:<长度>
-<payload>
-```
-
-校验失败或地址不匹配：`RXDONE ERROR DATA`
-
-### 退出透传
-
-发送 **`+++`**（仅三个 `+`，可跟换行）→ 回复 `AT_MODE`，回到 AT 指令模式。
-
-> 使用 `debug.py` 交互时，透传默认 **不** 在数据末尾自动追加 `\\r\\n`，避免破坏 `+++` 退出序列。
-
----
-
-## 八、状态与错误回显
-
-| 回显 | 含义 |
-|------|------|
-| `OK` | `AT` 测试成功 |
-| `LORA_TRANSPARENT_MODE` | `AT+CTX` 成功，已进入透传 |
-| `AT_MODE` | 上电默认，或 `+++` 退出透传后 |
-| `TXDONE` | 无线发送完成 |
-| `TXTIMEOUT` | 无线发送超时 |
-| `RXTIMEOUT` / `RXERROR` | 接收超时 / 错误 |
-| `BUSY` | 射频忙，透传数据未发送 |
-| `+CMD ERROR:1` | 指令格式错误或参数非法 |
-
----
-
-## 九、默认射频参数（未执行过 `AT+CTX` 时）
-
-| 参数 | 默认值 |
-|------|--------|
-| freq | 470625000 Hz |
-| dr | 3（SF9） |
-| bw | 0（125 kHz） |
-| cr | 1（4/5） |
-| pwr | 22 dBm |
-| iq | 0 |
-| 本机地址 | 0 |
-| 目标地址 | 1 |
+Select a frequency and power permitted in your region. Continuous-wave mode is intended for controlled RF testing. The automated checks compile and link the firmware but do not flash a module or verify UART timing, RF output, regulatory compliance, range, sleep current or interoperability.

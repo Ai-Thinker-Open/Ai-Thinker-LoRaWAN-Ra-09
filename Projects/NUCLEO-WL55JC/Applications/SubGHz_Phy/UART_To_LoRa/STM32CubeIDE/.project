@@ -33,7 +33,14 @@
 	</natures>
 	<linkedResources>
 		<link>
+			<name>STM32WL55JCIX_FLASH.ld</name>
 			<type>1</type>
+			<locationURI>PARENT-6-PROJECT_LOC/Projects/NUCLEO-WL55JC/Applications/SubGHz_Phy/SubGHz_Phy_PingPong/STM32CubeIDE/STM32WL55JCIX_FLASH.ld</locationURI>
+		</link>
+		<link>
+			<name>Startup/startup_stm32wl55xx_cm4.s</name>
+			<type>1</type>
+			<locationURI>PARENT-6-PROJECT_LOC/Drivers/CMSIS/Device/ST/STM32WLxx/Source/Templates/gcc/startup_stm32wl55xx_cm4.s</locationURI>
 		</link>
 		<link>
 			<name>Doc/readme.txt</name>
@@ -289,6 +296,16 @@
 			<name>Application/User/SubGHz_Phy/App/subghz_phy_app.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/SubGHz_Phy/App/subghz_phy_app.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/SubGHz_Phy/App/lora_transparent_at.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/SubGHz_Phy/App/lora_transparent_at.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/SubGHz_Phy/App/subg_command.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/SubGHz_Phy/App/subg_command.c</locationURI>
 		</link>
 		<link>
 			<name>Application/User/SubGHz_Phy/Target/radio_board_if.c</name>
