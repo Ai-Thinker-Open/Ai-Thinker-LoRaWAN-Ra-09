@@ -1,0 +1,25 @@
+name: Repository validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate repository structure and documentation
+        run: python3 tools/validate_repository.py
+
+  build-uart-to-lora:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GNU Arm Embedded toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y gcc-arm-none-eabi make
+      - name: Build UART to LoRa firmware
+        working-directory: Projects/NUCLEO-WL55JC/Applications/SubGHz_Phy/UART_To_LoRa
+        run: make -f GNUmakefile -j2
